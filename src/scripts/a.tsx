@@ -1,5 +1,3 @@
-/* tsconfig must have the Lestin jsxFactory configured (same as your other Lestin apps). */
-
 /* ------------------------------------------------------------------ */
 /* Data                                                                */
 /* ------------------------------------------------------------------ */
@@ -54,6 +52,26 @@ const CATEGORIES: AstroCategory[] = [
 	},
 ];
 
+/* Moon condition — the single most important pillar of اختیار.
+   The two states are mutually exclusive (the Moon is either good or bad). */
+const MOON_STATES: AstroCategory[] = [
+	{
+		key: "Moon+",
+		title: "وضعیت خوب ماه",
+		shortDesc:
+			"صلاح حال قمر؛ مهم‌ترین رکن اختیار. ماه در موقعیت مناسب آسمانی است و تعیین‌کنندهٔ عاقبت و کیفیت دستاوردهاست. بهترین زمان برای شروع کارهای مهم، به‌ویژه همراه با یک بلوک حوزه‌ای فعال.",
+	},
+	{
+		key: "Moon-",
+		title: "وضعیت نامناسب ماه",
+		shortDesc:
+			"هبوط و نحوست قمر. ماه در موقعیت نامناسب است؛ تا حد امکان از شروع کارهای مهم بپرهیزید و فقط در صورت اجبار، با توجه به بلوک‌های فعال اقدام کنید.",
+	},
+];
+
+/* Render order for title/description: Moon first, then houses. */
+const ALL_STATES: AstroCategory[] = [...MOON_STATES, ...CATEGORIES];
+
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
@@ -72,7 +90,7 @@ function toGCalDate(local: string): string {
 const buildTitle = (selected: AstroCategory[]): string => selected.map((c) => c.key).join(" & ");
 
 const buildDetails = (selected: AstroCategory[]): string =>
-	selected.map((c) => `${c.key} — ${c.title}\n${c.shortDesc}`).join("\n\n");
+	selected.map((c) => `${c.key} — ${c.title}\n${c.shortDesc}`).join("\n\n") + "\n\nوَمَا تَوْفِيقِي إِلَّا بِاللَّهِ";
 
 function buildGCalUrl(title: string, details: string, start: string, end: string): string {
 	// Built manually so the "/" between dates stays unencoded (Google requires it).
@@ -96,16 +114,17 @@ function App(): HTMLElement {
 	const endInput = (<input type="datetime-local" class="field-input dt" id="end" lang="en-GB" />) as HTMLInputElement;
 
 	const previewTitle = (<div class="preview-title">—</div>) as HTMLDivElement;
-	const previewDetails = (<div class="preview-details">حوزه‌ای انتخاب نشده است.</div>) as HTMLDivElement;
+	const previewDetails = (<div class="preview-details">موردی انتخاب نشده است.</div>) as HTMLDivElement;
 	const errorBox = (<div class="error-box" hidden></div>) as HTMLDivElement;
 
-	const getSelected = (): AstroCategory[] => CATEGORIES.filter((_, i) => checkboxes[i].checked);
+	// checkboxes[] is kept parallel to ALL_STATES (Moon states pushed first).
+	const getSelected = (): AstroCategory[] => ALL_STATES.filter((_, i) => checkboxes[i].checked);
 
 	function updatePreview(): void {
 		const selected = getSelected();
 		if (selected.length === 0) {
 			previewTitle.textContent = "—";
-			previewDetails.textContent = "حوزه‌ای انتخاب نشده است.";
+			previewDetails.textContent = "موردی انتخاب نشده است.";
 			return;
 		}
 		previewTitle.textContent = buildTitle(selected);
@@ -124,7 +143,7 @@ function App(): HTMLElement {
 	function onAdd(): void {
 		clearError();
 		const selected = getSelected();
-		if (selected.length === 0) return showError("حداقل یک حوزه را انتخاب کنید.");
+		if (selected.length === 0) return showError("حداقل یک مورد را انتخاب کنید.");
 		if (!startInput.value || !endInput.value) return showError("زمان شروع و پایان را وارد کنید.");
 		if (new Date(endInput.value) <= new Date(startInput.value)) return showError("زمان پایان باید بعد از زمان شروع باشد.");
 
@@ -139,6 +158,43 @@ function App(): HTMLElement {
 
 	startInput.addEventListener("input", clearError);
 	endInput.addEventListener("input", clearError);
+
+	/* Moon condition cards (pushed FIRST so they lead the title/description) */
+	const moonInputs: HTMLInputElement[] = [];
+	const moonRow = (<div class="moon-row"></div>) as HTMLDivElement;
+	MOON_STATES.forEach((state) => {
+		const good = state.key === "Moon+";
+		const sign = good ? "+" : "−";
+		const checkbox = (<input type="checkbox" class="moon-checkbox" value={state.key} />) as HTMLInputElement;
+		checkbox.addEventListener("change", () => {
+			// mutually exclusive: the Moon can't be good and bad at once
+			if (checkbox.checked) {
+				moonInputs.forEach((other) => {
+					if (other !== checkbox) other.checked = false;
+				});
+			}
+			updatePreview();
+			clearError();
+		});
+		moonInputs.push(checkbox);
+		checkboxes.push(checkbox);
+
+		moonRow.appendChild(
+			<label class={`moon-item ${good ? "is-good" : "is-bad"}`} data-sign={sign}>
+				{checkbox}
+				<span class="moon-glyph" aria-hidden="true"></span>
+				<span class="moon-body">
+					<span class="moon-key">
+						Moon<span class="moon-sign">{sign}</span>
+					</span>
+					<span class="moon-tag">{state.title}</span>
+				</span>
+				<span class="moon-check" aria-hidden="true">
+					✓
+				</span>
+			</label>,
+		);
+	});
 
 	/* category cards */
 	const catList = (<div class="cat-list"></div>) as HTMLDivElement;
@@ -175,16 +231,21 @@ function App(): HTMLElement {
 	return (
 		<div class="card">
 			<header class="head">
-				<h1 class="head-title">بلوک زمانی نجومی</h1>
+				<h1 class="head-title">بلوک‌های تقویم اختیارات</h1>
 				<p class="head-sub">
-					حوزه‌ها را انتخاب کنید، زمان شروع و پایان را وارد کنید و روی «افزودن» بزنید تا رویداد در تقویم گوگل ساخته
+					فعالیت‌ها را انتخاب کنید، زمان شروع و پایان را وارد کنید و روی «افزودن» بزنید تا رویداد در تقویم گوگل ساخته
 					شود.
 				</p>
 			</header>
 
 			<section class="section">
+				<div class="section-label">وضعیت ماه</div>
+				{moonRow}
+			</section>
+
+			<section class="section">
 				<div class="section-label">
-					حوزه‌ها <span class="hint">(چند انتخابی)</span>
+					فعالیت‌ها <span class="hint">(چند انتخابی)</span>
 				</div>
 				{catList}
 			</section>
@@ -220,6 +281,12 @@ function App(): HTMLElement {
 
 			{errorBox}
 			{addBtn}
+			<footer class="footer">
+				توسعه یافته توسط{" "}
+				<a class="footer-link" href="https://shmovahhedi.com" target="_blank" rel="noopener noreferrer">
+					شهاب‌الدّین موحّدی
+				</a>
+			</footer>
 		</div>
 	);
 }

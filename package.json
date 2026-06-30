@@ -4,6 +4,7 @@
 	"description": "",
 	"main": "index.js",
 	"scripts": {
+		"build": "vite build"
 	},
 	"keywords": [],
 	"author": "",
@@ -13,7 +14,7 @@
 		"lestin": "^0.3.0",
 		"sass": "^1.100.0",
 		"typescript": "^6.0.3",
-		"vite": "^8.0.14"
+		"vite": "^8.0.14",
+		"vite-plugin-singlefile": "^2.3.3"
 	}
 }
-
